@@ -1,49 +1,47 @@
 import React from 'react';
 import Title from './Title';
-import { assets, dummyCarData } from '../assets/assets';
+import { assets } from '../assets/assets';
 import CarCard from './CarCard';
 import { useNavigate } from 'react-router-dom';
+import { useAppContext } from '../context/AppContext'; 
 
-const FeauturedSection = () => {
-
-    // Хук для програмної навігації між сторінками
-    const navigate = useNavigate();
+const FeaturedSection = () => {
+  const navigate = useNavigate();
+  const { cars = [] } = useAppContext(); // захист від undefined
 
   return (
-    // Основний контейнер секції з адаптивними відступами
-    <div className='flex flex-col items-center py-24 px-6 md:px-16 
-    lg:px-24 xl:px-32'>FeauturedSection
-    
-        {/* Текстовий заголовок секції */}
-        <div>
-            <Title title='Beatured Vehicles' subTitle='Explore our 
-            selection of premium vehicles available for your next 
-            adventure.'/>
-        </div> 
+    <div className="flex flex-col items-center py-24 px-6 md:px-16 lg:px-24 xl:px-32">
+      <div>
+        <Title
+          title="Featured Vehicles"
+          subTitle="Explore our selection of premium vehicles available for your next adventure."
+        />
+      </div>
 
-        {/* Сітка з карточками машин */}
-        <div className='grid drid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-18'>
-        {
-            dummyCarData.slice(0,6).map((car)=> (
-                <div key={car._id}>
-                    <CarCard car={car}/>
-                </div>
-            ))
-        }
-        </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 mt-8 w-full">
+        {cars.length === 0 ? (
+          <p className="col-span-full text-center text-gray-500">No cars available</p>
+        ) : (
+          cars.slice(0, 6).map((car) => (
+            <div key={car._id || car.id}>
+              <CarCard car={car} />
+            </div>
+          ))
+        )}
+      </div>
 
-        {/* Кнопка для переходу на сторінку зі всіма машинами */}
-        <button onClick={()=> {
-            navigate('/cars'); scrollTo(0,0)
+      <button
+        onClick={() => {
+          navigate('/cars');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
         }}
-        className='flex items-center justify-center qap-2 px-6 py-2 border 
-        border-borderColor hover:bg-gray-50 rounded-md mt-18 cursor-pointer'>
-            Explore all cars <img src={assets.arrow_icon} alt="arrow" />
-        </button>
-
+        className="flex items-center justify-center gap-2 px-6 py-2 border border-borderColor hover:bg-gray-50 rounded-md mt-8 cursor-pointer"
+      >
+        <span>Explore all cars</span>
+        <img src={assets.arrow_icon} alt="arrow" />
+      </button>
     </div>
-
-  )
+  );
 };
 
-export default FeauturedSection;
+export default FeaturedSection;

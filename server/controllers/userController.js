@@ -1,6 +1,7 @@
 import User from "../models/User.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import Car from "../models/Car.js";
 
 // Generate JWT Token
 const generateToken = (userId) => {
@@ -66,3 +67,38 @@ export const getUserData = async (req, res) =>{
         res.json({ success: false, message: error.message });
     }
 }
+
+// Get All Cars for the Frontend
+export const getCars = async (req, res) => {
+  try {
+    const cars = await Car.find({isAvaliable: true})
+    res.json({ success: true, cars });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
+
+// Update User Image
+export const updateUserImage = async (req, res) => {
+  try {
+    if (!req.user) { 
+      return res.status(401).json({ success: false, message: "User not authorized" }); 
+    }
+
+
+    if (!req.file) {
+      return res.json({ success: false, message: "No image uploaded" });
+    }
+
+    const imagePath = `/uploads/${req.file.filename}`;
+
+    // оновлення користувача в базі
+    const updateUser = await User.findByIdAndUpdate(req.user._id, { image: imagePath }, { new: true });
+
+    res.json({ success: true, message: "Image Upload", image: updateUser.image });
+  } catch (error) {
+    console.error("Помилка updateUserImage:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

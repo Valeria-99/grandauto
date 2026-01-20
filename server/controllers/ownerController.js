@@ -1,15 +1,8 @@
-import { v2 as cloudinary } from "cloudinary";
-import Car from "../models/Car.js";
+import imagekit from "../configs/imageKit.js";
 import User from "../models/User.js";
+import Car from "../models/Car.js";
+import Booking from "../models/Booking.js";
 import fs from "fs";
-import path from "path";
-
-// Cloudinary конфіг
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 // API to Change Role of User
 export const changeRoleToOwner = async (req, res) => {
@@ -22,44 +15,170 @@ export const changeRoleToOwner = async (req, res) => {
   }
 };
 
-// API to Add Car
+// API to List Car
 export const addCar = async (req, res) => {
   try {
     const { _id } = req.user;
-    const carData = JSON.parse(req.body.carData);
+    const carData = JSON.parse(req.body.carData); // або просто req.body.carData, якщо вже об’єкт
+    const imageFile = req.file;
 
-    if (!req.file) {
-      return res.json({ success: false, message: "No image file provided" });
-    }
+    // Upload Image to ImageKit
+    const response = await imagekit.upload({
+      file: imageFile.buffer ? imageFile.buffer.toString("base64") : fs.readFileSync(imageFile.path),
+      fileName: imageFile.originalname,
+      folder: "cars",
+    });
 
-    let imageUrl;
-
-    try {
-      // Основний варіант: завантаження у Cloudinary
-      const uploadResponse = await cloudinary.uploader.upload(req.file.path, {
-        folder: "cars",
-        transformation: [{ width: 1280, quality: "auto", format: "webp" }],
-      });
-      imageUrl = uploadResponse.secure_url;
-    } catch (cloudError) {
-      console.error("Cloudinary error:", cloudError.message);
-
-      // Fallback: збереження локально
-      const localPath = path.join("uploads", req.file.originalname);
-      fs.writeFileSync(localPath, req.file.buffer);
-      imageUrl = `/uploads/${req.file.originalname}`;
-    }
+    // Оптимізований URL
+    const optimizedImageUrl = imagekit.url({
+      path: response.filePath,
+      transformation: [
+        { width: 1280, quality: "auto", format: "webp" },
+      ],
+    });
 
     const newCar = await Car.create({
       ...carData,
       owner: _id,
-      image: imageUrl,
+      image: optimizedImageUrl,
     });
 
     res.json({ success: true, message: "Car Added", car: newCar });
   } catch (error) {
+    console.log(error.message);
     res.json({ success: false, message: error.message });
   }
 };
 
+// API to List Owner Cars
+export const getOwnerCars = async (req, res)=> {
+  try {
+    const {_id} = req.user;
+    const cars = await Car.find({ owner: _id });
+    res.json({ success: true, cars });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
+
+// API to Toggle Car Availability
+export const toggleCarAvailability = async (req, res)=> {
+  try {
+    const { _id } = req.user;
+    const { carId } = req.body;
+    const car = await Car.findById(carId);
+
+    // Cheking is car belongs to the user
+    if (car.owner.toString() !== _id.toString()) {
+      return res.json({ success: false, message: "Unauthorized" });
+    }
+
+    car.isAvaliable = !car.isAvaliable;
+    await car.save();
+
+    res.json({ success: true, message: "Availability Toggled" });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
+
+// API to delete a car
+export const deleteCar = async (req, res)=> {
+  try {
+    const { _id } = req.user;
+    const { carId } = req.body;
+    const car = await Car.findById(carId);
+
+    // Cheking is car belongs to the user
+    if (car.owner.toString() !== _id.toString()) {
+      return res.json({ success: false, message: "Unauthorized" });
+    }
+
+    car.owner = null;
+    car.isAvaliable = false;
+
+    await car.save();
+
+    res.json({ success: true, message: "Car Removed" });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
+
+// API to get Dashboard Data
+export const getDashboardData = async (req, res)=> {
+  try {
+    const { _id} = req.user;
+
+    // Ensure user has owner role
+    if (!req.user || req.user.role !== 'owner') {
+      return res.json({ success: false, message: "Unauthorized" });
+    }
+
+    const cars = await Car.find({ owner: _id });
+    const bookings = await Booking.find({ owner: _id }).populate('car').sort({ createdAt: -1});
+
+    const pendingBookings = await Booking.find({ owner: _id, status: 'pending' });
+    const completedBookings = await Booking.find({ owner: _id, status: 'confirmed' });
+
+    // Calculate monthlyRevenue from bookings where status is confirmed
+
+    const monthlyRevenue = bookings.slice().filter(booking => 
+    booking.status === 'confirmed').reduce((acc, booking) => acc + booking.car.price, 0);
+
+    const dashboardData = {
+      totalCars: cars.length,
+      totalBookings: bookings.length,
+      pendingBookings: pendingBookings.length,
+      completedBookings: completedBookings.length,
+      recentBookings: bookings.slice(0, 3),
+      monthlyRevenue
+    }
+
+    res.json({ success: true, dashboardData });
+
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
+
+// API to update user image
+
+export const updateUserImage = async (req, res) => {
+  try {
+    const { _id } = req.user;
+
+    // Upload image to ImageKit
+    const fileBuffer = fs.readFileSync(imageFile.path);
+    const response = await imagekit.upload({
+      file: fileBuffer,
+      fileName: imageFile.originalname,
+      folder: "/users",
+    });
+
+    // optimization through imagekit URL transformation
+    let optimizedImageUrl = imagekit.url({
+      path: response.filePath,
+      transformation : [
+        { width: "4000"}, //Width resizing
+        {quality: "auto"}, //Auto compression
+        {format: "webp"} //Convert to modern format
+      ]
+    });
+
+    const image = optimizedImageUrl;
+
+
+    // Update user's image URL
+    const user = await User.findByIdAndUpdate(_id, { image: response.url }, { new: true })
+    res.json({ success: true, message: "Image Updated", user });
+  } catch (error) {
+    console.log(error.message);
+    res.json({ success: false, message: error.message });
+  }
+}
 

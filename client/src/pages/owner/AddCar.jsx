@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import Title from '../../components/owner/Title';
 import { assets } from '../../assets/assets';
+import { useAppContext } from '../../context/AppContext';
+import toast from 'react-hot-toast';
 
 const AddCar = () => {
 
-  const currency = import.meta.env.VITE_CURRENCY;
+  const {axios, currency} = useAppContext();
 
   const [image, setImage] = useState(null);
   const [car, setCar] = useState({
@@ -20,8 +22,47 @@ const AddCar = () => {
     description: '',
   })
 
+  const [isLoading, setIsLoading] = useState(false);
+
   const onSubmitHandler = async (e) => {
     e.preventDefault();
+    if(isLoading) return null;
+
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('image', image);
+      formData.append('carData', JSON.stringify(car));
+
+      const {data} = await axios.post('/api/owner/add-car', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      });
+
+      if(data.success) {
+        toast.success(data.message)
+        setImage(null)
+        setCar({
+          brand: '',
+          model: '',
+          year: 0,
+          pricePerDay: 0,
+          category: '',
+          transmission: '',
+          fuel_type: '',
+          seating_capacity: 0,
+          location: '',
+          description: ''
+        })
+      } else {
+        toast.error(data.message)
+      }
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -37,7 +78,7 @@ const AddCar = () => {
             <label htmlFor="car-image">
               <img src={image ? URL.createObjectURL(image) : assets.upload_icon} alt=""
               className='h-14 rounded cursor-pointer'/>
-              <input type="file" id="car-image" accapt="image/*" hidden onChange={e=>setImage(e.target.files[0])}/>
+              <input type="file" id="car-image" accept="image/*" hidden onChange={e=>setImage(e.target.files[0])}/>
             </label>
             <p className='text-sm text-gray-500'>Upload a picture of your car</p>
           </div>
@@ -122,13 +163,12 @@ const AddCar = () => {
               <select onChange={e=> setCar({...car, location: e.target.value})} value={car.location}
                 className='px-3 py-2 mt-1 border border-borderColor rounded-md outline-none'>
                 <option value="">Select a location</option>
-                <option value="Gas">Dnipro</option>
-                <option value="Diesel">Kyiv</option>
-                <option value="Petrol">Odessa</option>
-                <option value="Electric">Kharkiv</option>
-                <option value="Hybrid">Lviv</option>
-                <option value="Hybrid">Zaporizhnia</option>
-                <option value="Hybrid">Zaporizhnia</option>
+                <option value="Dnipro">Dnipro</option>
+                <option value="Kyiv">Kyiv</option>
+                <option value="Odessa">Odessa</option>
+                <option value="Kharkiv">Kharkiv</option>
+                <option value="Lviv">Lviv</option>
+                <option value="Zaporizhnia">Zaporizhnia</option>
               </select>
           </div>
 
@@ -143,7 +183,7 @@ const AddCar = () => {
         <button className='flex items-center gap-2 px-4 py-2.5 mt-4 bg-primary
          text-white rounded-md font-medium w-max cursor-pointer'>
           <img src={assets.tick_icon} alt="tick_icon" />
-          List Your Car
+          {isLoading ? "Listing..." : "List Your Car"}
         </button>
         
         </form>
